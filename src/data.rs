@@ -15,7 +15,7 @@ use std::collections::HashMap;
 pub struct ChessPositionRaw {
     pub fen: String,
     #[serde(rename = "cp")]
-    pub evaluation: Option<i64>,
+    pub evaluation: Option<f32>,
 }
 
 #[derive(Clone, Debug)]
@@ -127,7 +127,7 @@ impl Mapper<ChessPositionRaw, ChessPositionItem> for RawToItem{
             side_to_move,
             other_side: other_to_move,
             evaluation: match item.evaluation {
-                Some(val) => (val as f32) / 100.0,
+                Some(val) => val / 100.0,
                 None => {
                     match fen_str[1]{
                         "w" => {
