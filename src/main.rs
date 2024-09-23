@@ -14,7 +14,7 @@ fn main() {
     type MyBackend = Wgpu<f32, i32>;
     type MyAutodiffBackend = Autodiff<MyBackend>;
 
-    let device = burn::backend::wgpu::WgpuDevice::default();
+    let device = burn::backend::wgpu::WgpuDevice::Cpu;
     let artifact_dir = "/tmp/guide";
     crate::training::train::<MyAutodiffBackend>(
         artifact_dir,
