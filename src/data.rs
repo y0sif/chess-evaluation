@@ -13,15 +13,15 @@ use std::collections::HashMap;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChessPositionRaw {
-    #[serde(rename = "FEN")]
     pub fen: String,
-    #[serde(rename = "Evaluation")]
-    pub evaluation: String,
+    #[serde(rename = "cp")]
+    pub evaluation: Option<i64>,
 }
 
 #[derive(Clone, Debug)]
 pub struct ChessPositionItem{
-    pub fen_to_pieces: Vec<f32>,
+    pub side_to_move: Vec<f32>,
+    pub other_side: Vec<f32>,
     pub evaluation: f32,
 } 
 
@@ -46,22 +46,34 @@ impl Mapper<ChessPositionRaw, ChessPositionItem> for RawToItem{
         queen
          */
         let map = HashMap::from([
-            ('K', 0),
-            ('P', 1),
-            ('N', 2),
-            ('B', 3),
-            ('R', 4),
-            ('Q', 5),
-            ('k', 6),
-            ('p', 7),
-            ('n', 8),
-            ('b', 9),
-            ('r', 10),
-            ('q', 11),
+            ('P', 0),
+            ('N', 1),
+            ('B', 2),
+            ('R', 3),
+            ('Q', 4),
+            ('p', 5),
+            ('n', 6),
+            ('b', 7),
+            ('r', 8),
+            ('q', 9),
         ]);
-        let mut position = [[0.0; 64]; 12];
-
+        let mut position = [[0.0; 64]; 10];
+        
         let fen_str: Vec<&str> = item.fen.split_whitespace().collect();
+        
+        let (to_move, other) = match fen_str[1]{
+            "w" => {
+                ('K', 'k')
+            },
+            "b" => {
+                ('k', 'K')
+            },
+            _ => {
+                (' ', ' ')
+            },
+        };
+        let mut to_move_square = 0;
+        let mut other_square = 0;
         let mut count: usize = 0;
         for piece in fen_str[0].chars(){
             if piece == '/'{
@@ -69,6 +81,16 @@ impl Mapper<ChessPositionRaw, ChessPositionItem> for RawToItem{
             }
             if piece.is_numeric(){
                 count += piece.to_digit(10).unwrap() as usize;
+                continue;
+            }
+            if piece == to_move{
+                to_move_square = count;
+                count += 1;
+                continue;
+            }
+            if piece == other{
+                other_square = count;
+                count += 1;
                 continue;
             }
             if let Some(value) = map.get(&piece){
@@ -79,25 +101,46 @@ impl Mapper<ChessPositionRaw, ChessPositionItem> for RawToItem{
 
         let position: Vec<f32> = position.into_iter()
                                 .flat_map(|item| item).collect();
+        let mut side_to_move: Vec<Vec<f32>> = Vec::new();
+        let mut other_to_move: Vec<Vec<f32>> = Vec::new();
+        for i in 0..64{
+            if i == to_move_square{
+                side_to_move.push(position.clone());
+            }else {
+                side_to_move.push([0.0; 640].to_vec());
+            }
+            if i == other_square{
+                other_to_move.push(position.clone());
+            }else {
+                other_to_move.push([0.0; 640].to_vec());
+            }
 
+        }
+        let side_to_move: Vec<f32> = side_to_move.into_iter()
+                                    .flat_map(|item| item).collect();
+        let other_to_move: Vec<f32> = other_to_move.into_iter()
+                                    .flat_map(|item| item).collect();
+
+        assert_eq!(side_to_move.len(), 64 * 64 * 5 * 2);
+        assert_eq!(other_to_move.len(), 64 * 64 * 5 * 2);
         ChessPositionItem {
-            fen_to_pieces: position,
-            evaluation: match item.evaluation.parse::<f32>() {
-                Ok(val) => val,
-                Err(_) => {
-                    let sign = &item.evaluation[0..1];
-                    let len = item.evaluation.len() - 1;
-                    let num = &item.evaluation[1..len];
-                    match sign{
-                        "-" => {
-                            -1.0 * num.parse::<f32>().unwrap()
+            side_to_move,
+            other_side: other_to_move,
+            evaluation: match item.evaluation {
+                Some(val) => (val as f32) / 100.0,
+                None => {
+                    match fen_str[1]{
+                        "w" => {
+                            1000.0
                         },
-                        "+" => {
-                            num.parse::<f32>().unwrap()
+                        "b" => {
+                            -1000.0
                         },
-                        _ => 0.0
+                        _ => {
+                            0.0
+                        },
                     }
-                },
+                }
             }
         }
     }
@@ -131,8 +174,8 @@ impl ChessPositionDataSet {
 
     fn new(split: &str) -> Self{
         type ChessEval = SqliteDataset<ChessPositionRaw>;
-        let root: SqliteDataset<ChessPositionRaw> = HuggingfaceDatasetLoader::new("ssingh22/chess-evaluations")
-            .with_subset("randoms")
+        let root: SqliteDataset<ChessPositionRaw> = HuggingfaceDatasetLoader::new("Lichess/chess-evaluations")
+            .with_base_dir("\\d\\d_cache\\burn_dataset")
             .dataset("train") // The training split.
             .unwrap();
 
@@ -180,23 +223,37 @@ impl<B: Backend> ChessPositionBatcher<B> {
         let max = inp.clone().max_dim(0);
         (inp.clone() - min.clone()).div(max - min)
     }
+    
+    pub fn normalize<const D: usize>(&self, inp:Tensor<B, D>) -> Tensor<B, D>{
+        inp.div_scalar(100.0)
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct ChessPositionBatch<B: Backend> {
-    pub fens: Tensor<B, 2>,
+    pub side_to_move: Tensor<B, 2>,
+    pub other_side: Tensor<B, 2>,
     pub evaluations: Tensor<B, 1>,
 }
 
 impl <B: Backend> Batcher<ChessPositionItem, ChessPositionBatch<B>> for ChessPositionBatcher<B>{
     fn batch(&self, items: Vec<ChessPositionItem>) -> ChessPositionBatch<B> {
-        let mut fens: Vec<Tensor<B, 2>> = Vec::new();
+        let mut side_to_move: Vec<Tensor<B, 2>> = Vec::new();
         for item in items.iter() {
-            let fens_tensor = Tensor::<B, 1>::from_data(item.fen_to_pieces.as_slice(), &self.device);
-            fens.push(fens_tensor.unsqueeze());
+            let side_to_move_tensor = Tensor::<B, 1>::from_data(item.side_to_move.as_slice(), &self.device);
+            side_to_move.push(side_to_move_tensor.unsqueeze());
         }
 
-        let fens = Tensor::cat(fens, 0);
+        let side_to_move = Tensor::cat(side_to_move, 0);
+        
+        let mut other_side: Vec<Tensor<B, 2>> = Vec::new();
+        for item in items.iter() {
+            let other_side_tensor = Tensor::<B, 1>::from_data(item.other_side.as_slice(), &self.device);
+            other_side.push(other_side_tensor.unsqueeze());
+        }
+
+        let other_side = Tensor::cat(other_side, 0);
+
 
         let evaluations = items
             .iter()
@@ -204,7 +261,8 @@ impl <B: Backend> Batcher<ChessPositionItem, ChessPositionBatch<B>> for ChessPos
             .collect();
         let evaluations = Tensor::cat(evaluations, 0); 
         //let evaluations = self.min_max_norm(evaluations);
+        let evaluations = self.normalize(evaluations);
 
-        ChessPositionBatch { fens: fens, evaluations: evaluations }
+        ChessPositionBatch { side_to_move, other_side, evaluations }
     }
 }

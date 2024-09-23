@@ -1,14 +1,15 @@
-use burn::{config::Config, data::dataloader::DataLoaderBuilder, module::Module, nn::loss::{MseLoss, Reduction}, optim::AdamConfig, prelude::Backend, record::CompactRecorder, tensor::{backend::AutodiffBackend, Tensor}, train::{metric::{store::{Aggregate, Direction, Split}, LossMetric}, LearnerBuilder, MetricEarlyStoppingStrategy, RegressionOutput, StoppingCondition, TrainOutput, TrainStep, ValidStep}};
+use burn::{config::Config, data::dataloader::DataLoaderBuilder, module::Module, nn::loss::{MseLoss, Reduction}, optim::AdamConfig, prelude::Backend, record::CompactRecorder, tensor::{backend::AutodiffBackend, Tensor}, train::{metric::{store::{Aggregate, Direction, Split}, LossMetric, TopKAccuracyInput, TopKAccuracyMetric}, LearnerBuilder, MetricEarlyStoppingStrategy, RegressionOutput, StoppingCondition, TrainOutput, TrainStep, ValidStep}};
 
 use crate::{data::{ChessPositionBatch, ChessPositionBatcher, ChessPositionDataSet}, model::{Model, ModelConfig}};
 
 impl <B: Backend> Model<B> {
     pub fn forward_regression(
         &self,
-        fens: Tensor<B, 2>,
+        side_to_move: Tensor<B, 2>,
+        other_side: Tensor<B, 2>,
         evaluations: Tensor<B, 1>,
     ) -> RegressionOutput<B> {
-        let output = self.forward(fens);
+        let output = self.forward(side_to_move, other_side);
         let loss = MseLoss::new().forward(output.clone(), evaluations.clone().unsqueeze(), Reduction::Mean);
         
         RegressionOutput::new(loss, output.unsqueeze(), evaluations.unsqueeze())
@@ -17,7 +18,7 @@ impl <B: Backend> Model<B> {
 
 impl<B: AutodiffBackend> TrainStep<ChessPositionBatch<B>, RegressionOutput<B>> for Model<B> {
     fn step(&self, batch: ChessPositionBatch<B>) -> burn::train::TrainOutput<RegressionOutput<B>> {
-        let item = self.forward_regression(batch.fens, batch.evaluations);
+        let item = self.forward_regression(batch.side_to_move, batch.other_side, batch.evaluations);
 
         TrainOutput::new(self, item.loss.backward(), item)
     }
@@ -26,7 +27,7 @@ impl<B: AutodiffBackend> TrainStep<ChessPositionBatch<B>, RegressionOutput<B>> f
 
 impl <B: Backend> ValidStep<ChessPositionBatch<B>, RegressionOutput<B>> for Model<B> {
     fn step(&self, batch: ChessPositionBatch<B>) -> RegressionOutput<B> {
-        self.forward_regression(batch.fens, batch.evaluations) 
+        self.forward_regression(batch.side_to_move, batch.other_side, batch.evaluations)
     }
 }
 
