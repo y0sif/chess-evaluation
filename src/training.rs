@@ -61,6 +61,8 @@ pub fn train<B: AutodiffBackend>(artifact_dir: &str, config: TrainingConfig, dev
         .expect("Config should be saved successfully");
 
     B::seed(config.seed);
+    println!("started training");
+    
 
     let batcher_train = ChessPositionBatcher::<B>::new(device.clone());
     let batcher_valid = ChessPositionBatcher::<B::InnerBackend>::new(device.clone());

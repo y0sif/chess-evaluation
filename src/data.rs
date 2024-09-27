@@ -173,10 +173,13 @@ impl ChessPositionDataSet {
     }
 
     fn new(split: &str) -> Self{
+        println!("dataloading started");
         type ChessEval = SqliteDataset<ChessPositionRaw>;
         let root: SqliteDataset<ChessPositionRaw> = HuggingfaceDatasetLoader::new("Lichess/chess-evaluations")
             .dataset("train") // The training split.
             .unwrap();
+
+        println!("dataloading finished");
 
         let dataset = ShuffledDataset::<ChessEval,ChessPositionRaw>::with_seed(root, 42);
         let len = dataset.len();
@@ -188,6 +191,7 @@ impl ChessPositionDataSet {
             _ => panic!("Invalid split type"),                     // Handle unexpected split types
         };
 
+        println!("data spliting done");
         let mut fens = Vec::new();
         let mut evals = Vec::new();
         for item in data_split.iter(){
