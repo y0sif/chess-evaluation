@@ -186,8 +186,8 @@ impl ChessPositionDataSet {
         type PartialData = PartialDataset<ShuffledDataset<ChessEval, ChessPositionRaw>, ChessPositionRaw>;
 
         let data_split = match split {
-            "train" => PartialData::new(dataset, 0, len * 8 / 10), // Get first 80% dataset
-            "test" => PartialData::new(dataset, len * 8 / 10, len), // Take remaining 20%
+            "train" => PartialData::new(dataset, 0, 800000), // Get first 80% dataset
+            "test" => PartialData::new(dataset, 800000, 1000000), // Take remaining 20%
             _ => panic!("Invalid split type"),                     // Handle unexpected split types
         };
 
