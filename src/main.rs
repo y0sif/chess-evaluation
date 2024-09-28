@@ -1,9 +1,8 @@
 use crate::{model::ModelConfig, training::TrainingConfig};
 use burn::{
     backend::{Autodiff, Wgpu},
-    optim::AdamConfig, tensor::Tensor,
+    optim::AdamConfig, 
 };
-use burn_dataset::transform::Mapper;
 
 mod training;
 mod model;

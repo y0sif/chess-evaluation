@@ -1,4 +1,4 @@
-use burn::{config::Config, data::dataloader::DataLoaderBuilder, module::Module, nn::loss::{MseLoss, Reduction}, optim::AdamConfig, prelude::Backend, record::CompactRecorder, tensor::{backend::AutodiffBackend, Tensor}, train::{metric::{store::{Aggregate, Direction, Split}, LossMetric, TopKAccuracyInput, TopKAccuracyMetric}, LearnerBuilder, MetricEarlyStoppingStrategy, RegressionOutput, StoppingCondition, TrainOutput, TrainStep, ValidStep}};
+use burn::{config::Config, data::dataloader::DataLoaderBuilder, module::Module, nn::loss::{MseLoss, Reduction}, optim::AdamConfig, prelude::Backend, record::CompactRecorder, tensor::{backend::AutodiffBackend, Tensor}, train::{metric::{store::{Aggregate, Direction, Split}, LossMetric, }, LearnerBuilder, MetricEarlyStoppingStrategy, RegressionOutput, StoppingCondition, TrainOutput, TrainStep, ValidStep}};
 
 use crate::{data::{ChessPositionBatch, ChessPositionBatcher, ChessPositionDataSet}, model::{Model, ModelConfig}};
 

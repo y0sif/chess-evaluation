@@ -182,7 +182,6 @@ impl ChessPositionDataSet {
         println!("dataloading finished");
 
         let dataset = ShuffledDataset::<ChessEval,ChessPositionRaw>::with_seed(root, 42);
-        let len = dataset.len();
         type PartialData = PartialDataset<ShuffledDataset<ChessEval, ChessPositionRaw>, ChessPositionRaw>;
 
         let data_split = match split {
@@ -221,11 +220,6 @@ impl<B: Backend> ChessPositionBatcher<B> {
         Self{ device }
     }
 
-    pub fn min_max_norm<const D: usize>(&self, inp: Tensor<B, D>) -> Tensor<B, D> {
-        let min = inp.clone().min_dim(0);
-        let max = inp.clone().max_dim(0);
-        (inp.clone() - min.clone()).div(max - min)
-    }
     
     pub fn normalize<const D: usize>(&self, inp:Tensor<B, D>) -> Tensor<B, D>{
         inp.div_scalar(100.0)
